@@ -1,13 +1,14 @@
-use reqwest::header::ACCEPT;
-use reqwest::header::AUTHORIZATION;
-use reqwest::header::CONTENT_TYPE;
+use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE};
 
 #[tokio::main]
 async fn main() {
-    let cont = get("https://api.spotify.com/v1/me/player/currently-playing").await;
+    let cont = get("https://api.spotify.com/v1/me/tracks").await;
     let v: serde_json::Value = serde_json::from_str(&cont.unwrap()).unwrap();
-    let name = v["item"]["name"].to_string();
-    println!("{}", name);
+    let saved_songs = &v["items"];
+    for i in 0..saved_songs.as_array().unwrap().len() {
+        let track = &saved_songs[i]["track"];
+        println!("{}. {}", i+1, track["name"]);
+    }
 }
 
 async fn get(url: &str) -> Result<String, Box<dyn std::error::Error>> {
