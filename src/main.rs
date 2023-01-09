@@ -7,7 +7,7 @@ async fn main() {
     let saved_songs = &v["items"];
     for i in 0..saved_songs.as_array().unwrap().len() {
         let track = &saved_songs[i]["track"];
-        println!("{}. {}", i+1, track["name"]);
+        println!("{}. {} => {}", i+1, track["name"], track["external_urls"]["spotify"]);
     }
 }
 
