@@ -4,23 +4,30 @@ use std::fs;
 
 #[tokio::main]
 async fn main() {
-    let cont = get("https://api.spotify.com/v1/me").await;
-    let v: Value = from_str(&cont.unwrap()).unwrap();
-    let uid = &v["id"].to_string();
+    let uid_req = get("https://api.spotify.com/v1/me").await;
+    let v: Value = from_str(&uid_req.unwrap()).unwrap();
+    let uid = &v["id"].to_string()[1..&v["id"].to_string().len()-1];
 
-    let cont = post(&("https://api.spotify.com/v1/users/".to_string() + &(uid[1..uid.len()-1]) + "/playlists")).await;
-    let v: Value = from_str(&cont.unwrap()).unwrap();
-    println!("{}", &v["name"].to_string());
+    let playlist_req = post(&("https://api.spotify.com/v1/users/".to_string() + uid + "/playlists")).await;
+    let v: Value = from_str(&playlist_req.unwrap()).unwrap();
+    let pid = &v["id"].to_string()[1..&v["id"].to_string().len()-1];
 
-    let cont = get("https://api.spotify.com/v1/me/tracks").await;
-    let v: Value = from_str(&cont.unwrap()).unwrap();
-    let saved_songs = &v["items"];
-    for i in 0..saved_songs.as_array().unwrap().len() {
-        let track = &saved_songs[i]["track"];
+    let tracks_req = get("https://api.spotify.com/v1/me/tracks?limit=50").await;
+    let v: Value = from_str(&tracks_req.unwrap()).unwrap();
+    let saved_tracks = &v["items"];
+    let mut uris = String::new();
+    for i in 0 .. saved_tracks.as_array().unwrap().len() {
+        let track = &saved_tracks[i]["track"];
         let uri = &track["uri"].to_string()[1..track["uri"].to_string().len()-1];
         let name = &track["name"].to_string()[1..track["name"].to_string().len()-1];
         println!("{}. {} => {}", i+1, name, uri);
+        uris.push_str(uri);
+        uris.push(',');
     }
+    
+    let add_req = post(&("https://api.spotify.com/v1/playlists/".to_string() + pid + "/tracks?uris=" + &uris)).await;
+    let v: Value = from_str(&add_req.unwrap()).unwrap();
+    println!("{}", v.to_string());
 }
 
 async fn get(url: &str) -> Result<String, Box<dyn std::error::Error>> {
@@ -41,10 +48,10 @@ async fn post(url: &str) -> Result<String, Box<dyn std::error::Error>> {
     // Obviously, the data is subject to change
     // Also, the visibility remains public no matter the value for some reason
     let data = json!({
-        "name": "Playlist Test",
+        "name": "Test Playlist",
         "description": "Spotify API",
-        "public": "false"
-    });
+        "public": false,
+    }).to_string();
 
     let client = reqwest::Client::new();
     let token = fs::read_to_string(".env").expect("Failed");
@@ -52,7 +59,7 @@ async fn post(url: &str) -> Result<String, Box<dyn std::error::Error>> {
         .header(ACCEPT, "application/json")
         .header(CONTENT_TYPE, "application/json")
         .header(AUTHORIZATION, "Bearer ".to_string() + &token)
-        .body(data.to_string())
+        .body(data)
         .send()
         .await?
         .text()
