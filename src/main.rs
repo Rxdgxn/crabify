@@ -4,14 +4,21 @@ use std::fs;
 
 #[tokio::main]
 async fn main() {
+
+    // Get user ID
     let uid_req = get("https://api.spotify.com/v1/me").await;
     let v: Value = from_str(&uid_req.unwrap()).unwrap();
     let uid = &v["id"].to_string()[1..&v["id"].to_string().len()-1];
+    let username = &v["display_name"].to_string()[1..&v["display_name"].to_string().len()-1];
 
-    let playlist_req = post(&("https://api.spotify.com/v1/users/".to_string() + uid + "/playlists")).await;
+
+    // Create playlist
+    let playlist_req = post(&("https://api.spotify.com/v1/users/".to_string() + uid + "/playlists"), username).await;
     let v: Value = from_str(&playlist_req.unwrap()).unwrap();
     let pid = &v["id"].to_string()[1..&v["id"].to_string().len()-1];
 
+
+    // Get saved tracks
     let tracks_req = get("https://api.spotify.com/v1/me/tracks?limit=50").await;
     let v: Value = from_str(&tracks_req.unwrap()).unwrap();
     let saved_tracks = &v["items"];
@@ -24,8 +31,10 @@ async fn main() {
         uris.push_str(uri);
         uris.push(',');
     }
+
     
-    let add_req = post(&("https://api.spotify.com/v1/playlists/".to_string() + pid + "/tracks?uris=" + &uris)).await;
+    // Add the tracks to the playlist
+    let add_req = post(&("https://api.spotify.com/v1/playlists/".to_string() + pid + "/tracks?uris=" + &uris), username).await;
     let v: Value = from_str(&add_req.unwrap()).unwrap();
     println!("{}", v.to_string());
 }
@@ -44,17 +53,17 @@ async fn get(url: &str) -> Result<String, Box<dyn std::error::Error>> {
     Ok(body)
 }
 
-async fn post(url: &str) -> Result<String, Box<dyn std::error::Error>> {
+async fn post(url: &str, username: &str) -> Result<String, Box<dyn std::error::Error>> {
     // Obviously, the data is subject to change
     // Also, the visibility remains public no matter the value for some reason
     let data = json!({
-        "name": "Test Playlist",
+        "name": &(username.to_string() + &"'s Saved Songs"),
         "description": "Spotify API",
         "public": false,
     }).to_string();
 
     let client = reqwest::Client::new();
-    let token = fs::read_to_string(".env").expect("Failed");
+    let token = fs::read_to_string(".env").expect("Failed to read .env file");
     let body = client.post(url)
         .header(ACCEPT, "application/json")
         .header(CONTENT_TYPE, "application/json")
