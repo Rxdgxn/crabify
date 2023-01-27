@@ -1,21 +1,17 @@
-use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE};
+use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, CONTENT_LENGTH};
 use serde_json::{from_str, json, Value};
 use std::fs;
 
 #[tokio::main]
 async fn main() {
 
+    let content = std::fs::read_to_string("pid.spid").expect("Failed to read .spid file");
+
     // Get user ID
     let uid_req = get("https://api.spotify.com/v1/me").await;
     let v: Value = from_str(&uid_req.unwrap()).unwrap();
     let uid = &v["id"].to_string()[1..&v["id"].to_string().len()-1];
     let username = &v["display_name"].to_string()[1..&v["display_name"].to_string().len()-1];
-
-
-    // Create playlist
-    let playlist_req = post(&("https://api.spotify.com/v1/users/".to_string() + uid + "/playlists"), username).await;
-    let v: Value = from_str(&playlist_req.unwrap()).unwrap();
-    let pid = &v["id"].to_string()[1..&v["id"].to_string().len()-1];
 
 
     // Get saved tracks
@@ -33,15 +29,31 @@ async fn main() {
     }
 
     
-    // Add the tracks to the playlist
-    let add_req = post(&("https://api.spotify.com/v1/playlists/".to_string() + pid + "/tracks?uris=" + &uris), username).await;
-    let v: Value = from_str(&add_req.unwrap()).unwrap();
-    println!("{}", v.to_string());
+    match &content as &str {
+        "" => {
+            // Create playlist
+            let playlist_req = post(&("https://api.spotify.com/v1/users/".to_string() + uid + "/playlists"), username).await;
+            let v: Value = from_str(&playlist_req.unwrap()).unwrap();
+            let pid = &v["id"].to_string()[1..&v["id"].to_string().len()-1];
+
+            // Add tracks to playlist and save ID
+            fs::write("pid.spid", pid).expect("Failed to write to .spid file");
+            let add_req = post(&("https://api.spotify.com/v1/playlists/".to_string() + pid + "/tracks?uris=" + &uris), username).await;
+            let v: Value = from_str(&add_req.unwrap()).unwrap();
+            println!("{}", v.to_string());
+        },
+        id => {
+            // Replace the tracks
+            let replace_req = put(&("https://api.spotify.com/v1/playlists/".to_string() + id + "/tracks?uris=" + &uris)).await;
+            let v: Value = from_str(&replace_req.unwrap()).unwrap();
+            println!("{}", v.to_string());
+        }
+    }
 }
 
 async fn get(url: &str) -> Result<String, Box<dyn std::error::Error>> {
     let client = reqwest::Client::new();
-    let token = fs::read_to_string(".env").expect("Failed");
+    let token = fs::read_to_string(".env").expect("Failed to read .env file");
     let body = client.get(url)
         .header(ACCEPT, "application/json")
         .header(CONTENT_TYPE, "application/json")
@@ -50,6 +62,22 @@ async fn get(url: &str) -> Result<String, Box<dyn std::error::Error>> {
         .await?
         .text()
         .await?;
+    Ok(body)
+}
+
+async fn put(url: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let client = reqwest::Client::new();
+    let token = fs::read_to_string(".env").expect("Failed to read .env file");
+    let body = client.put(url)
+        .header(ACCEPT, "application/json")
+        .header(CONTENT_TYPE, "application/json")
+        .header(AUTHORIZATION, "Bearer ".to_string() + &token)
+        .body("Content-Length: ".to_string() + &CONTENT_LENGTH.to_string())
+        .send()
+        .await?
+        .text()
+        .await?;
+    
     Ok(body)
 }
 
