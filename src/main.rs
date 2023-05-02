@@ -2,10 +2,16 @@ use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, CONTENT_LENGTH};
 use serde_json::{from_str, json, Value};
 use std::fs;
 
+macro_rules! read_token {
+    () => {
+        fs::read_to_string(".env").expect("Failed to read .env file")
+    };
+}
+
 #[tokio::main]
 async fn main() {
 
-    let content = std::fs::read_to_string("pid.spid").expect("Failed to read .spid file");
+    let content = fs::read_to_string("pid.spid").expect("Failed to read .spid file");
 
     // Get user ID
     let uid_req = get("https://api.spotify.com/v1/me").await;
@@ -32,13 +38,18 @@ async fn main() {
     match &content as &str {
         "" => {
             // Create playlist
-            let playlist_req = post(&("https://api.spotify.com/v1/users/".to_string() + uid + "/playlists"), username).await;
+            let data = json!({
+                "name": &(username.to_string() + &"'s Saved Songs"),
+                "description": "Spotify API",
+                "public": false,
+            }).to_string();
+            let playlist_req = post(&("https://api.spotify.com/v1/users/".to_string() + uid + "/playlists"), data).await;
             let v: Value = from_str(&playlist_req.unwrap()).unwrap();
             let pid = &v["id"].to_string()[1..&v["id"].to_string().len()-1];
 
             // Add tracks to playlist and save ID
             fs::write("pid.spid", pid).expect("Failed to write to .spid file");
-            let add_req = post(&("https://api.spotify.com/v1/playlists/".to_string() + pid + "/tracks?uris=" + &uris), username).await;
+            let add_req = post(&("https://api.spotify.com/v1/playlists/".to_string() + pid + "/tracks?uris=" + &uris), String::new()).await;
             let v: Value = from_str(&add_req.unwrap()).unwrap();
             println!("{}", v.to_string());
         },
@@ -51,9 +62,13 @@ async fn main() {
     }
 }
 
+async fn grab_token() {
+
+}
+
 async fn get(url: &str) -> Result<String, Box<dyn std::error::Error>> {
     let client = reqwest::Client::new();
-    let token = fs::read_to_string(".env").expect("Failed to read .env file");
+    let token = read_token!();
     let body = client.get(url)
         .header(ACCEPT, "application/json")
         .header(CONTENT_TYPE, "application/json")
@@ -67,7 +82,7 @@ async fn get(url: &str) -> Result<String, Box<dyn std::error::Error>> {
 
 async fn put(url: &str) -> Result<String, Box<dyn std::error::Error>> {
     let client = reqwest::Client::new();
-    let token = fs::read_to_string(".env").expect("Failed to read .env file");
+    let token = read_token!();
     let body = client.put(url)
         .header(ACCEPT, "application/json")
         .header(CONTENT_TYPE, "application/json")
@@ -81,17 +96,9 @@ async fn put(url: &str) -> Result<String, Box<dyn std::error::Error>> {
     Ok(body)
 }
 
-async fn post(url: &str, username: &str) -> Result<String, Box<dyn std::error::Error>> {
-    // Obviously, the data is subject to change
-    // Also, the visibility remains public no matter the value for some reason
-    let data = json!({
-        "name": &(username.to_string() + &"'s Saved Songs"),
-        "description": "Spotify API",
-        "public": false,
-    }).to_string();
-
+async fn post(url: &str, data: String) -> Result<String, Box<dyn std::error::Error>> {
     let client = reqwest::Client::new();
-    let token = fs::read_to_string(".env").expect("Failed to read .env file");
+    let token = read_token!();
     let body = client.post(url)
         .header(ACCEPT, "application/json")
         .header(CONTENT_TYPE, "application/json")
