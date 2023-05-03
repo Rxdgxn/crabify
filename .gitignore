@@ -1,3 +1,4 @@
 /target
 .env
-pid.spid
+*.spid
+*.secret

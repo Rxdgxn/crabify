@@ -1,5 +1,6 @@
 use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, CONTENT_LENGTH};
 use serde_json::{from_str, json, Value};
+use base64::{Engine as _, engine::general_purpose};
 use std::fs;
 
 macro_rules! read_token {
@@ -10,6 +11,9 @@ macro_rules! read_token {
 
 #[tokio::main]
 async fn main() {
+
+    let token = grab_token().await;
+    fs::write(".env", token).expect("Failed to write token to .env file");
 
     let content = fs::read_to_string("pid.spid").expect("Failed to read .spid file");
 
@@ -62,8 +66,20 @@ async fn main() {
     }
 }
 
-async fn grab_token() {
+async fn grab_token() -> String {
+    let client_id = String::from(include_str!("../id.secret").trim());
+    let client_secret = String::from(include_str!("../secret.secret").trim());
+    let auth = client_id + ":" + &client_secret;
+    let data = json!({
+        "grant_type": "client_credentials", // ??????????????????????????
+    }).to_string();
 
+    let tok_req = custom_post("https://accounts.spotify.com/api/token", data, auth).await;
+    let v: Value = from_str(&tok_req.unwrap()).unwrap();
+    println!("{:?}", v);
+    let token = v["access_token"].to_string();
+    
+    token
 }
 
 async fn get(url: &str) -> Result<String, Box<dyn std::error::Error>> {
@@ -103,6 +119,21 @@ async fn post(url: &str, data: String) -> Result<String, Box<dyn std::error::Err
         .header(ACCEPT, "application/json")
         .header(CONTENT_TYPE, "application/json")
         .header(AUTHORIZATION, "Bearer ".to_string() + &token)
+        .body(data)
+        .send()
+        .await?
+        .text()
+        .await?;
+
+    Ok(body)
+}
+
+// TODO: get rid of this
+async fn custom_post(url: &str, data: String, auth: String) -> Result<String, Box<dyn std::error::Error>> {
+    let client = reqwest::Client::new();
+    let body = client.post(url)
+        .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+        .header(AUTHORIZATION, "Basic ".to_string() + &general_purpose::URL_SAFE_NO_PAD.encode(auth))
         .body(data)
         .send()
         .await?
