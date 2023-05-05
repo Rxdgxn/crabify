@@ -2,3 +2,5 @@
 .env
 *.spid
 *.secret
+/node_modules
+*.json
