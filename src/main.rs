@@ -1,6 +1,10 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
+
 use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, CONTENT_LENGTH};
 use serde_json::{from_str, json, Value};
 use std::fs;
+use eframe::{egui, App, run_native, NativeOptions};
+use egui::ScrollArea;
 
 macro_rules! read_token {
     () => {
@@ -9,15 +13,16 @@ macro_rules! read_token {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), eframe::Error> {
 
     let content = fs::read_to_string("pid.spid").expect("Failed to read .spid file");
 
     // Get user ID
     let uid_req = get("https://api.spotify.com/v1/me").await;
     let v: Value = from_str(&uid_req.unwrap()).unwrap();
-    let uid = &v["id"].to_string()[1..&v["id"].to_string().len()-1];
-    let username = &v["display_name"].to_string()[1..&v["display_name"].to_string().len()-1];
+    // Note: the format 1 .. x - 1 is required because of the `\TRACK\` json response
+    let uid = &v["id"].to_string()[1 .. &v["id"].to_string().len()-1];
+    let username = String::from(&v["display_name"].to_string()[1 .. &v["display_name"].to_string().len()-1]);
 
 
     // Get saved tracks
@@ -25,11 +30,15 @@ async fn main() {
     let v: Value = from_str(&tracks_req.unwrap()).unwrap();
     let saved_tracks = &v["items"];
     let mut uris = String::new();
+    let mut tracks: Vec<String> = Vec::new(); // actual tracks list
+
     for i in 0 .. saved_tracks.as_array().unwrap().len() {
         let track = &saved_tracks[i]["track"];
-        let uri = &track["uri"].to_string()[1..track["uri"].to_string().len()-1];
-        let name = &track["name"].to_string()[1..track["name"].to_string().len()-1];
-        println!("{}. {} => {}", i+1, name, uri);
+        let uri = &track["uri"].to_string()[1 .. track["uri"].to_string().len()-1];
+        let name = &track["name"].to_string()[1 .. track["name"].to_string().len()-1];
+        // TODO: artist(s)
+        // println!("{}. {} => {}", i + 1, name, uri);
+        tracks.push(String::from(name));
         uris.push_str(uri);
         uris.push(',');
     }
@@ -39,13 +48,13 @@ async fn main() {
         "" => {
             // Create playlist
             let data = json!({
-                "name": &(username.to_string() + &"'s Saved Songs"),
+                "name": &(username.clone() + &"'s Saved Songs"),
                 "description": "Spotify API",
                 "public": false,
             }).to_string();
             let playlist_req = post(&("https://api.spotify.com/v1/users/".to_string() + uid + "/playlists"), data).await;
             let v: Value = from_str(&playlist_req.unwrap()).unwrap();
-            let pid = &v["id"].to_string()[1..&v["id"].to_string().len()-1];
+            let pid = &v["id"].to_string()[1 .. &v["id"].to_string().len()-1];
 
             // Add tracks to playlist and save ID
             fs::write("pid.spid", pid).expect("Failed to write to .spid file");
@@ -60,7 +69,48 @@ async fn main() {
             println!("{}", v.to_string());
         }
     }
+
+    let native_options = NativeOptions::default();
+    run_native("GUI Test", native_options, Box::new(|cc| Box::new(MainApp::new(cc, tracks, username))))
 }
+
+#[derive(Default)]
+struct MainApp {
+    tracks: Vec<String>,
+    username: String
+}
+
+impl MainApp {
+    fn new(_cc: &eframe::CreationContext<'_>, tracks: Vec<String>, username: String) -> Self {
+        Self { tracks, username }
+    }
+}
+
+impl App for MainApp {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            ui.heading(format!("Here are all of {}'s amazing songs!", self.username));
+            ui.heading(""); // Funny spacing hack for now
+
+            ScrollArea::vertical()
+                .auto_shrink(false)
+                .stick_to_bottom(true)
+                .show(ui, |ui| {
+                    // The list of the saved tracks
+                    for track in &self.tracks {
+                        ui.horizontal(|ui| {
+                            ui.label(track);
+                            if ui.button("Copy Link").clicked() {
+                                println!("Copied to clipboard");
+                            }
+                        });
+                    }
+                });
+        });
+    }
+}
+
+// In the future, the requests should be handled better
 
 async fn get(url: &str) -> Result<String, Box<dyn std::error::Error>> {
     let client = reqwest::Client::new();
