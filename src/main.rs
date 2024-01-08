@@ -30,15 +30,24 @@ async fn main() -> Result<(), eframe::Error> {
     let v: Value = from_str(&tracks_req.unwrap()).unwrap();
     let saved_tracks = &v["items"];
     let mut uris = String::new();
-    let mut tracks: Vec<String> = Vec::new(); // actual tracks list
+    
+    let mut tracks: Vec<(String, String)> = Vec::new(); // actual tracks list
 
     for i in 0 .. saved_tracks.as_array().unwrap().len() {
         let track = &saved_tracks[i]["track"];
         let uri = &track["uri"].to_string()[1 .. track["uri"].to_string().len()-1];
         let name = &track["name"].to_string()[1 .. track["name"].to_string().len()-1];
-        // TODO: artist(s)
-        // println!("{}. {} => {}", i + 1, name, uri);
-        tracks.push(String::from(name));
+        
+        let mut current_artists = String::new();
+        let artists_info = track["artists"].as_array().unwrap();
+        for a in artists_info {
+            let artist_name = &a["name"].to_string()[1 .. a["name"].to_string().len()-1];
+            current_artists.push_str(artist_name);
+            current_artists.push_str(", ");
+        }
+
+        tracks.push((String::from(name), String::from(&current_artists[0 .. current_artists.len()-2])));
+
         uris.push_str(uri);
         uris.push(',');
     }
@@ -71,17 +80,18 @@ async fn main() -> Result<(), eframe::Error> {
     }
 
     let native_options = NativeOptions::default();
-    run_native("GUI Test", native_options, Box::new(|cc| Box::new(MainApp::new(cc, tracks, username))))
+    run_native("Crabify", native_options, Box::new(|cc| Box::new(MainApp::new(cc, tracks, username))))
 }
 
+// TODO: link for copying to clipboard + Track struct
 #[derive(Default)]
 struct MainApp {
-    tracks: Vec<String>,
+    tracks: Vec<(String, String)>, // (track_name, artists)
     username: String
 }
 
 impl MainApp {
-    fn new(_cc: &eframe::CreationContext<'_>, tracks: Vec<String>, username: String) -> Self {
+    fn new(_cc: &eframe::CreationContext<'_>, tracks: Vec<(String, String)>, username: String) -> Self {
         Self { tracks, username }
     }
 }
@@ -99,7 +109,7 @@ impl App for MainApp {
                     // The list of the saved tracks
                     for track in &self.tracks {
                         ui.horizontal(|ui| {
-                            ui.label(track);
+                            ui.label(format!("\"{}\" by {}", track.0, track.1));
                             if ui.button("Copy Link").clicked() {
                                 println!("Copied to clipboard");
                             }
