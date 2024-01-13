@@ -5,6 +5,7 @@ use serde_json::{from_str, json, Value};
 use std::fs;
 use eframe::{egui, App, run_native, NativeOptions};
 use egui::ScrollArea;
+use clipboard::{ClipboardProvider, ClipboardContext};
 
 macro_rules! read_token {
     () => {
@@ -31,12 +32,17 @@ async fn main() -> Result<(), eframe::Error> {
     let saved_tracks = &v["items"];
     let mut uris = String::new();
     
-    let mut tracks: Vec<(String, String)> = Vec::new(); // actual tracks list
+    let mut tracks: Vec<Track> = Vec::new(); // actual tracks list
 
     for i in 0 .. saved_tracks.as_array().unwrap().len() {
         let track = &saved_tracks[i]["track"];
+
         let uri = &track["uri"].to_string()[1 .. track["uri"].to_string().len()-1];
+        
         let name = &track["name"].to_string()[1 .. track["name"].to_string().len()-1];
+
+        let external_urls = track["external_urls"].as_object().unwrap();
+        let link = &external_urls["spotify"].to_string()[1 .. external_urls["spotify"].to_string().len()-1];
         
         let mut current_artists = String::new();
         let artists_info = track["artists"].as_array().unwrap();
@@ -46,7 +52,7 @@ async fn main() -> Result<(), eframe::Error> {
             current_artists.push_str(", ");
         }
 
-        tracks.push((String::from(name), String::from(&current_artists[0 .. current_artists.len()-2])));
+        tracks.push(Track::from(name.to_string(), current_artists, link.to_string()));
 
         uris.push_str(uri);
         uris.push(',');
@@ -83,15 +89,26 @@ async fn main() -> Result<(), eframe::Error> {
     run_native("Crabify", native_options, Box::new(|cc| Box::new(MainApp::new(cc, tracks, username))))
 }
 
-// TODO: link for copying to clipboard + Track struct
+struct Track {
+    name: String,
+    artist: String,
+    link: String
+}
+
+impl Track {
+    fn from(name: String, artist: String, link: String) -> Self {
+        Self { name, artist, link }
+    }
+}
+
 #[derive(Default)]
 struct MainApp {
-    tracks: Vec<(String, String)>, // (track_name, artists)
+    tracks: Vec<Track>,
     username: String
 }
 
 impl MainApp {
-    fn new(_cc: &eframe::CreationContext<'_>, tracks: Vec<(String, String)>, username: String) -> Self {
+    fn new(_cc: &eframe::CreationContext<'_>, tracks: Vec<Track>, username: String) -> Self {
         Self { tracks, username }
     }
 }
@@ -109,9 +126,13 @@ impl App for MainApp {
                     // The list of the saved tracks
                     for track in &self.tracks {
                         ui.horizontal(|ui| {
-                            ui.label(format!("\"{}\" by {}", track.0, track.1));
+                            ui.label(format!("\"{}\" by {}", track.name, track.artist));
+                            
                             if ui.button("Copy Link").clicked() {
-                                println!("Copied to clipboard");
+                                let mut ctx: ClipboardContext = ClipboardProvider::new().unwrap();
+                                ctx.set_contents(track.link.to_owned()).unwrap();
+
+                                println!("Copied to clipboard: {}", track.link);
                             }
                         });
                     }
