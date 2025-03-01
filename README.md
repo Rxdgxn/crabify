@@ -8,4 +8,5 @@ Special thanks to [Brittany Chiang](https://www.newline.co/courses/build-a-spoti
 Instructions:
 * Run `node script.js`
 * Navigate to `localhost:8888/login`
-* Close the Node process from the terminal
+* Close the node.js process from the terminal
+* `cargo run --release`
