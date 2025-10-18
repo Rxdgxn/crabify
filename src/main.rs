@@ -15,7 +15,7 @@ macro_rules! read_token {
 
 #[tokio::main]
 async fn main() -> Result<(), eframe::Error> {
-
+    // "Custom format" for the playlist ID of the liked songs copy
     let content = fs::read_to_string("pid.spid").expect("Failed to read .spid file");
 
     // Get user ID
@@ -46,10 +46,15 @@ async fn main() -> Result<(), eframe::Error> {
         
         let mut current_artists = String::new();
         let artists_info = track["artists"].as_array().unwrap();
-        for a in artists_info {
+        for i  in 0 .. artists_info.len() {
+            let a = &artists_info[i];
+
             let artist_name = &a["name"].to_string()[1 .. a["name"].to_string().len()-1];
             current_artists.push_str(artist_name);
-            current_artists.push_str(", ");
+
+            if i != artists_info.len() - 1 {
+                current_artists.push_str(", ");
+            }
         }
 
         tracks.push(Track::from(name.to_string(), current_artists, link.to_string()));
@@ -121,7 +126,7 @@ impl App for MainApp {
 
             ScrollArea::vertical()
                 .auto_shrink(false)
-                .stick_to_bottom(true)
+                .stick_to_bottom(false)
                 .show(ui, |ui| {
                     // The list of the saved tracks
                     for track in &self.tracks {

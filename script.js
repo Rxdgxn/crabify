@@ -1,3 +1,6 @@
+// NOTE: this Javascript part is required get an access token. In the future i will switch fully to Rust
+// This is according to their tutorial: https://developer.spotify.com/documentation/web-api/tutorials/code-flow
+
 var fs = require('fs');
 var client_id = fs.readFileSync('./id.secret', 'utf-8');
 var client_secret = fs.readFileSync('./secret.secret', 'utf-8');
