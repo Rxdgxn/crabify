@@ -8,11 +8,11 @@ Terrible implementation, I know, but it does what I wanted it to do.
 * NodeJS and npm (preferably latest versions)
 
 ## Instructions:
-* Register an app on https://developer.spotify.com/ and set the redirect URI to http://localhost:8888/callback
+* Register an app on https://developer.spotify.com/ and set the redirect URI to http://127.0.0.1:8888/callback
 * Create 2 files outside the src folder, called id.secret and secret.secret (very inspired names)
 * Get the client id and client secret from the app and place them in their respective files
 * `npm install`
 * `node script.js`
-* Navigate to `localhost:8888/login`
+* Navigate to `127.0.0.1:8888/login`
 * Close the node.js process from the terminal. The access token for the Spotify Web API should now be in the .env file
 * `cargo run --release`

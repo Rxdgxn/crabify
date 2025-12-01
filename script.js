@@ -1,15 +1,16 @@
-// NOTE: this Javascript part is required get an access token. In the future i will switch fully to Rust
+// NOTE: this Javascript part is required to get an access token. In the future i will switch fully to Rust
 // This is according to their tutorial: https://developer.spotify.com/documentation/web-api/tutorials/code-flow
 
-var fs = require('fs');
-var client_id = fs.readFileSync('./id.secret', 'utf-8');
-var client_secret = fs.readFileSync('./secret.secret', 'utf-8');
-var request = require('request');
-var express = require('express');
-var querystring = require('querystring');
-var redirect_uri = 'http://localhost:8888/callback';
-var app = express();
-var port = 8888;
+let fs = require('fs');
+let client_id = fs.readFileSync('./id.secret', 'utf-8');
+let client_secret = fs.readFileSync('./secret.secret', 'utf-8');
+let request = require('request');
+let express = require('express');
+let querystring = require('querystring');
+
+const port = 8888;
+let redirect_uri = `http://127.0.0.1:${port}/callback`;
+let app = express();
 
 function generateRandomString(length) {
   let text = '';
@@ -20,9 +21,9 @@ function generateRandomString(length) {
   return text;
 }
 
-app.get('/login', function(req, res) {
-  var state = generateRandomString(16);
-  var scope = 'playlist-modify-public playlist-modify-private user-library-read user-library-modify';
+app.get('/login', function(_req, res) {
+  let state = generateRandomString(16);
+  let scope = 'playlist-modify-public playlist-modify-private user-library-read user-library-modify';
   res.cookie('spotify_auth_state', state);
 
   res.redirect('https://accounts.spotify.com/authorize?' +
@@ -36,8 +37,8 @@ app.get('/login', function(req, res) {
 });
 
 app.get('/callback', function(req, res) {
-  var code = req.query.code || null;
-  var state = req.query.state || null;
+  let code = req.query.code || null;
+  let state = req.query.state || null;
 
   if (state === null) {
     res.redirect('/#' +
@@ -45,7 +46,7 @@ app.get('/callback', function(req, res) {
         error: 'state_mismatch'
       }));
   } else {
-    var authOptions = {
+    let authOptions = {
       url: 'https://accounts.spotify.com/api/token',
       form: {
         code: code,
@@ -60,7 +61,7 @@ app.get('/callback', function(req, res) {
 
     request.post(authOptions, function(error, response, body) {
       if (!error && response.statusCode === 200) {
-        var token = body.access_token;
+        let token = body.access_token;
         fs.writeFileSync('./.env', token);
       }
       else {
@@ -72,5 +73,5 @@ app.get('/callback', function(req, res) {
 });
 
 app.listen(port, () => {
-  console.log('Listening at localhost:' + port);
+  console.log(`Listening at localhost:${port}/login`);
 });

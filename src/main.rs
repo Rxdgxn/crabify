@@ -1,6 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, CONTENT_LENGTH};
+use reqwest::{Client, header::{ACCEPT, AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE}};
 use serde_json::{from_str, json, Value};
 use std::fs;
 use eframe::{egui, App, run_native, NativeOptions};
@@ -15,6 +15,14 @@ macro_rules! read_token {
 
 #[tokio::main]
 async fn main() -> Result<(), eframe::Error> {
+    // TODO: port to rust getting the api token (use rocket for routing)
+
+    let client_id = fs::read_to_string("id.secret").expect("Failed to read the id.secret file");
+    let client_secret = fs::read_to_string("secret.secret").expect("Failed to read the secret.secret file");
+    let redirect_uri = "http://127.0.0.1:8888/callback";
+
+    let client = Client::new();
+
     // "Custom format" for the playlist ID of the liked songs copy
     let content = fs::read_to_string("pid.spid").expect("Failed to read .spid file");
 
@@ -149,7 +157,7 @@ impl App for MainApp {
 // In the future, the requests should be handled better
 
 async fn get(url: &str) -> Result<String, Box<dyn std::error::Error>> {
-    let client = reqwest::Client::new();
+    let client = Client::new();
     let token = read_token!();
     let body = client.get(url)
         .header(ACCEPT, "application/json")
@@ -163,7 +171,7 @@ async fn get(url: &str) -> Result<String, Box<dyn std::error::Error>> {
 }
 
 async fn put(url: &str) -> Result<String, Box<dyn std::error::Error>> {
-    let client = reqwest::Client::new();
+    let client = Client::new();
     let token = read_token!();
     let body = client.put(url)
         .header(ACCEPT, "application/json")
@@ -179,7 +187,7 @@ async fn put(url: &str) -> Result<String, Box<dyn std::error::Error>> {
 }
 
 async fn post(url: &str, data: String) -> Result<String, Box<dyn std::error::Error>> {
-    let client = reqwest::Client::new();
+    let client = Client::new();
     let token = read_token!();
     let body = client.post(url)
         .header(ACCEPT, "application/json")
